@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 import httpx
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 
@@ -7,6 +8,17 @@ app = FastAPI(
     title="Live NEPSE API",
     description="Standalone API for Live NEPSE Index Data",
     version="1.0.0"
+)
+
+# -------------------------------------------------
+# CORS settings
+# -------------------------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Restrict in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 NEPSELYTICS_LIVE_NEPSE_URL = (
