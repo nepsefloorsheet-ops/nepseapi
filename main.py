@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 NEPSELYTICS_LIVE_NEPSE_URL = (
-    "https://nepselytics-6d61dea19f30.herokuapp.com/api/nepselytics/live-nepse"
+    "https://sharehubnepal.com/live/api/v2/nepselive/live-nepse"
 )
 
 # -------------------------------------------------
