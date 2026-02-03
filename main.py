@@ -25,6 +25,13 @@ NEPSELYTICS_LIVE_NEPSE_URL = (
     "https://sharehubnepal.com/live/api/v2/nepselive/live-nepse"
 )
 
+MARKET_DEPTH_BASE_URL = (
+    "https://sharehubnepal.com/live/api/v1/nepselive/market-depth"
+)
+
+# Cache for symbol to ID mapping to avoid repetitive calls
+symbol_to_id_cache = {}
+
 # -------------------------------------------------
 # Root
 # -------------------------------------------------
@@ -58,6 +65,58 @@ async def live_nepse():
         )
 
     return resp.json()
+
+# -------------------------------------------------
+# Market Depth Endpoint
+# -------------------------------------------------
+@app.get("/market-depth/{symbol}")
+async def get_market_depth(symbol: str):
+    symbol = symbol.upper()
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
+    }
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        # Step 1: Find security_id if not in cache
+        security_id = symbol_to_id_cache.get(symbol)
+        
+        if not security_id:
+            live_resp = await client.get(NEPSELYTICS_LIVE_NEPSE_URL, headers=headers)
+            if live_resp.status_code != 200:
+                raise HTTPException(status_code=500, detail="Failed to fetch live data for mapping")
+            
+            live_data = live_resp.json()
+            # live-nepse usually returns a list of objects like {"symbol": "ADBL", "security_id": 123, ...}
+            # Or it might be nested in "data" or "results"
+            
+            # Find the security_id
+            found = False
+            # Check if it's a list or dictionary
+            items = live_data if isinstance(live_data, list) else live_data.get("data", [])
+            
+            for item in items:
+                if item.get("symbol") == symbol:
+                    security_id = item.get("securityId") or item.get("security_id") or item.get("id")
+                    if security_id:
+                        symbol_to_id_cache[symbol] = security_id
+                        found = True
+                        break
+            
+            if not found:
+                raise HTTPException(status_code=404, detail=f"Symbol {symbol} not found")
+
+        # Step 2: Fetch market depth using security_id
+        depth_url = f"{MARKET_DEPTH_BASE_URL}/{security_id}"
+        depth_resp = await client.get(depth_url, headers=headers)
+
+    if depth_resp.status_code != 200:
+        raise HTTPException(
+            status_code=depth_resp.status_code,
+            detail="Failed to fetch market depth"
+        )
+
+    return depth_resp.json()
 
 # -------------------------------------------------
 # Run Server
