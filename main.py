@@ -3,6 +3,7 @@ import httpx
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
+from datetime import datetime
 
 app = FastAPI(
     title="Live NEPSE API",
@@ -29,6 +30,10 @@ MARKET_DEPTH_BASE_URL = (
     "https://sharehubnepal.com/live/api/v1/nepselive/market-depth"
 )
 
+BROKER_SNAPSHOT_URL = (
+    "https://api.nepalytix.com/api/broker-daily-snapshot/filter/"
+)
+
 # Cache for symbol to ID mapping to avoid repetitive calls
 symbol_to_id_cache = {}
 
@@ -39,7 +44,13 @@ symbol_to_id_cache = {}
 def root():
     return {
         "status": "Live NEPSE API Running",
-        "endpoint": "/live-nepse"
+        "version": "1.0.0",
+        "available_endpoints": {
+            "/live-nepse": "Real-time NEPSE index and scrip data",
+            "/market-depth/{symbol}": "Live L2 Order Book / Market Depth for a specific symbol",
+            "/broker-snapshot": "Daily broker-wise buy/sell snapshot (supports ?date=YYYY-MM-DD)",
+            "/docs": "Interactive Swagger API documentation"
+        }
     }
 
 # -------------------------------------------------
@@ -117,6 +128,36 @@ async def get_market_depth(symbol: str):
         )
 
     return depth_resp.json()
+
+# -------------------------------------------------
+# Broker Daily Snapshot Endpoint
+# -------------------------------------------------
+@app.get("/broker-snapshot")
+async def get_broker_snapshot(date: str = None):
+    """
+    Fetches the broker daily snapshot. 
+    Defaults to today's date if 'date' query parameter is not provided.
+    Format: YYYY-MM-DD
+    """
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+        
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json"
+    }
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        url = f"{BROKER_SNAPSHOT_URL}?date={date}"
+        resp = await client.get(url, headers=headers)
+
+    if resp.status_code != 200:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"Failed to fetch broker snapshot for date {date}"
+        )
+
+    return resp.json()
 
 # -------------------------------------------------
 # Run Server
