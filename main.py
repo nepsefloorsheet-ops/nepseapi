@@ -31,7 +31,7 @@ MARKET_DEPTH_BASE_URL = (
 )
 
 BROKER_SNAPSHOT_URL = (
-    "https://api.nepalytix.com/api/broker-daily-snapshot/filter/"
+    "https://chukul.com/api/data/broker-summary/"
 )
 
 # Cache for symbol to ID mapping to avoid repetitive calls
@@ -48,7 +48,7 @@ def root():
         "available_endpoints": {
             "/live-nepse": "Real-time NEPSE index and scrip data",
             "/market-depth/{symbol}": "Live L2 Order Book / Market Depth for a specific symbol",
-            "/broker-snapshot": "Daily broker-wise buy/sell snapshot (supports ?date=YYYY-MM-DD)",
+            "/broker-snapshot": "Latest broker daily buy/sell summary from Chukul",
             "/docs": "Interactive Swagger API documentation"
         }
     }
@@ -133,28 +133,22 @@ async def get_market_depth(symbol: str):
 # Broker Daily Snapshot Endpoint
 # -------------------------------------------------
 @app.get("/broker-snapshot")
-async def get_broker_snapshot(date: str = None):
+async def get_broker_snapshot():
     """
-    Fetches the broker daily snapshot. 
-    Defaults to today's date if 'date' query parameter is not provided.
-    Format: YYYY-MM-DD
+    Fetches the latest broker daily summary.
     """
-    if not date:
-        date = datetime.now().strftime("%Y-%m-%d")
-        
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/json"
     }
 
     async with httpx.AsyncClient(timeout=15) as client:
-        url = f"{BROKER_SNAPSHOT_URL}?date={date}"
-        resp = await client.get(url, headers=headers)
+        resp = await client.get(BROKER_SNAPSHOT_URL, headers=headers)
 
     if resp.status_code != 200:
         raise HTTPException(
             status_code=resp.status_code,
-            detail=f"Failed to fetch broker snapshot for date {date}"
+            detail="Failed to fetch broker summary"
         )
 
     return resp.json()
